@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Tracker</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            margin: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #4a90e2;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #4a90e2;
+            margin-bottom: 20px;
+        }
+        form {
+            margin-bottom: 30px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #357abd;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            background: #f9f9f9;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 5px solid #4a90e2;
+        }
+        #transactions {
+            display: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            color: #333;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .income {
+            color: green;
+        }
+        .expense {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Finance Tracker</h1>
+
+        <div id="auth">
+            <h2>Register</h2>
+            <form id="registerForm">
+                <input type="text" id="username" placeholder="Username" required>
+                <input type="email" id="email" placeholder="Email" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button type="submit">Register</button>
+            </form>
+
+            <h2>Login</h2>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+
+        <div id="transactions">
+            <h2>Add Transaction</h2>
+            <form id="transactionForm">
+                <select id="type" required>
+                    <option value="income">Income</option>
+                    <option value="expense">Expense</option>
+                </select>
+                <input type="text" id="category" placeholder="Category" required>
+                <input type="number" id="amount" placeholder="Amount" step="0.01" required>
+                <input type="text" id="description" placeholder="Description">
+                <input type="date" id="date" required>
+                <button type="submit">Add Transaction</button>
+            </form>
+
+            <h2>Transactions</h2>
+            <table id="transactionList"></table>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        // Register
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const response = await fetch(`${API_BASE}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            const result = await response.json();
+            alert(JSON.stringify(result));
+        });
+
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const response = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const result = await response.json();
+            if (result.token) {
+                localStorage.setItem('token', result.token);
+                document.getElementById('auth').style.display = 'none';
+                document.getElementById('transactions').style.display = 'block';
+                loadTransactions();
+            } else {
+                alert('Login failed: ' + JSON.stringify(result));
+            }
+        });
+
+        // Add Transaction
+        document.getElementById('transactionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const type = document.getElementById('type').value;
+            const category = document.getElementById('category').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const description = document.getElementById('description').value;
+            const date = document.getElementById('date').value;
+            const response = await fetch(`${API_BASE}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, category, amount, description, date })
+            });
+            const result = await response.json();
+            alert(JSON.stringify(result));
+            loadTransactions();
+        });
+
+        // Load Transactions
+        async function loadTransactions() {
+            const response = await fetch(`${API_BASE}/transactions`);
+            const transactions = await response.json();
+            const list = document.getElementById('transactionList');
+            list.innerHTML = '';
+            const thead = document.createElement('thead');
+            const tr = document.createElement('tr');
+            const th1 = document.createElement('th');
+            th1.textContent = 'Type';
+            const th2 = document.createElement('th');
+            th2.textContent = 'Category';
+            const th3 = document.createElement('th');
+            th3.textContent = 'Amount';
+            const th4 = document.createElement('th');
+            th4.textContent = 'Description';
+            const th5 = document.createElement('th');
+            th5.textContent = 'Date';
+            tr.appendChild(th1);
+            tr.appendChild(th2);
+            tr.appendChild(th3);
+            tr.appendChild(th4);
+            tr.appendChild(th5);
+            thead.appendChild(tr);
+            list.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            transactions.forEach(t => {
+                const tr = document.createElement('tr');
+                const td1 = document.createElement('td');
+                td1.textContent = t.type;
+                td1.className = t.type === 'income' ? 'income' : 'expense';
+                const td2 = document.createElement('td');
+                td2.textContent = t.category;
+                const td3 = document.createElement('td');
+                td3.textContent = `$${t.amount}`;
+                const td4 = document.createElement('td');
+                td4.textContent = t.description || '';
+                const td5 = document.createElement('td');
+                td5.textContent = t.date;
+                tr.appendChild(td1);
+                tr.appendChild(td2);
+                tr.appendChild(td3);
+                tr.appendChild(td4);
+                tr.appendChild(td5);
+                tbody.appendChild(tr);
+            });
+            list.appendChild(tbody);
+        }
+    </script>
+</body>
+</html>
